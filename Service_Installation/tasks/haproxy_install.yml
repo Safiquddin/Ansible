@@ -1,0 +1,63 @@
+---
+  - name: Check if rpm exists
+    stat:
+      path: /tmp/{{ haproxy_pkg }}
+    register: rpmexist
+
+  - name: download rpms
+    get_url:
+     url: "{{ nexus_url }}/{{ haproxy_pkg }}"
+     dest: /tmp/
+     url_username: "{{ nexus_uname }}"
+     url_password: "{{ nexus_password }}"
+     mode: 0777
+    when: rpmexist.stat.exists == False
+  
+  - name: install HAProxy
+    yum:
+       name: /tmp/{{ haproxy_pkg }}
+       state: present
+
+  # - name: Copy the updated configuration file
+  #  copy:
+  #       src: haproxy/haproxy.cfg
+  #      dest: /etc/haproxy/
+  #     backup: yes
+
+  - name: Check if HAproxy is installed
+    package_facts:
+         manager: "auto"
+
+  - name: HAProxy test result
+    debug:
+         msg: "haproxy found"
+    when: "'haproxy' in ansible_facts.packages"
+
+  - name: HAProxy test result
+    debug:
+         msg: "HAProxy NOT found"
+    when: "'haproxy' not in ansible_facts.packages"
+
+  - name: Start haproxy service
+    service:
+        name: haproxy
+        state: started
+        enabled: yes
+
+  - name: ensure that haproxy is running
+    shell: systemctl status haproxy
+    register: haproxy_status
+    ignore_errors: yes
+
+  - name: haproxy status
+    debug:
+        msg="haproxy is running"
+    when: haproxy_status.stdout.find("running") != -1
+
+  - name: haproxy status
+    debug:
+        msg="haproxy is not running"
+    when: haproxy_status.stdout.find("running") == -1
+
+
+

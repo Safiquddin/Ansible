@@ -1,0 +1,25 @@
+---
+nginx_pkg: nginx-1.10.2-1.el7.ngx.x86_64.rpm
+tomcat_pkg : apache-tomcat-8.5.24
+haproxy_pkg : haproxy-1.5.18-9.el7.x86_64.rpm
+rmq_pkg : rmq.tar
+mysql_pkg : mysql.tar
+redis_pkg : redis-3.2.12-2.el7.x86_64.rpm
+php-pkg : ------.rpm
+
+#nexus_url: http://10.2.35.11:8081/repository/softwares
+nexus_url: http://10.0.3.30/nexus/service/local/repositories/RPMs/content/
+nexus_uname : nexus
+nexus_password : sadad123
+
+solr_workspace : /tmp
+solr_filename : solr-7.2.1
+solr_install_dir : /opt
+solr_home : /var/{{ solr_service_name }}
+solr_service_name : solr
+solr_user : solr
+solr_group : solr
+solr_port : 8983
+zk_install_dir : /opt
+zk_filename : zookeeper-3.4.10
+

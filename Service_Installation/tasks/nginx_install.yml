@@ -1,0 +1,74 @@
+---
+  - name: Check if rpm exists
+    stat:
+      path: /tmp/{{ nginx_pkg }}
+    register: rpmexist
+
+  - name: download rpms
+    get_url:
+     url: "{{ nexus_url }}/{{ nginx_pkg }}"
+     dest: /tmp/
+     url_username: "{{ nexus_uname }}"
+     url_password: "{{ nexus_password }}"
+     mode: 0777
+    when: rpmexist.stat.exists == False
+  
+  - name: Installing Nginx Server
+    yum:
+       name: /tmp/{{ nginx_pkg }}
+       state: present
+  
+  - name: Check if NGINX is installed
+    package_facts:
+       manager: "auto"
+  
+  - name: NGINX test result
+    debug:
+       msg: "NGINX found"
+    when: "'nginx' in ansible_facts.packages"
+  
+  - name: NGINX test result
+    debug:
+      msg: "NGINX NOT found"
+    when: "'nginx' not in ansible_facts.packages"
+    
+#  - name : Copying updated Master/Global config file to /etc/nginx.conf
+#   copy :
+#      src : nginx/nginx.conf
+#      dest : /etc/nginx/
+#      backup : yes
+
+#  - name: Copying the default configuration file
+#   copy:
+#      src: nginx/default.conf
+#      dest: /etc/nginx/conf.d/
+#      backup: yes
+
+  #- name: cleaning installation files
+  #   file:
+  #     path: /var/tmp/{{ nginx_pkg }}
+  #      state: absent
+
+  - name : Start Nginx Server
+    service:
+        name : nginx
+        state : started
+        enabled : yes
+
+  - name: ensure that nginx is running
+    shell: systemctl status nginx
+    register: nginx_status
+    ignore_errors: yes
+
+  - name: nginx status
+    debug:
+       msg="nginx is running"
+    when: nginx_status.stdout.find("running") != -1
+
+  - name: nginx status
+    debug:
+      msg="nginx is not running"
+    when: nginx_status.stdout.find("running") == -1
+
+
+

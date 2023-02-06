@@ -1,0 +1,90 @@
+---
+    - name: Check that the zookeeper package already exists
+      stat:
+          path: "{{ solr_workspace }}/{{ zk_filename }}.tar"
+      register: rpmexist
+
+    - name: download rpms
+      get_url:
+          url: "{{ nexus_url }}/{{ zk_filename }}.tar.gz"
+          dest: /tmp/
+          url_username: "{{ nexus_uname }}"
+          url_password: "{{ nexus_password }}"
+          mode: 0777
+      when: rpmexist.stat.exists == False
+
+    - name: extract the service installation file..
+      unarchive:
+        src : "{{ solr_workspace }}/{{ zk_filename }}.tar.gz"
+        dest: "{{ zk_install_dir }}"
+
+    - name :  changing permissions for zookeeper directory
+      file:
+         path : "{{ zk_install_dir }}/{{ zk_filename }}"
+         owner: "{{ solr_user }}"
+         group: "{{ solr_group }}"
+         mode: "u+rwx,g+rx,o=rx"
+         recurse : yes
+         state : directory
+
+    - name: create data directory
+      file:
+         path: /opt/zookeeper
+         state: directory
+         owner: "{{ solr_user }}"
+         group: "{{ solr_group }}"
+         mode: 0755
+
+    - name : Modidfying zoo-sample.cfg file
+      replace:
+        path: "{{ zk_install_dir }}/{{ zk_filename }}/conf/zoo_sample.cfg
+        regexp: 'tmp'
+        replace: 'opt'
+
+    - name : Renaming conf file
+      shell : mv "{{ zk_install_dir }}/{{ zk_filename }}/conf/zoo_sample.cfg" "{{ zk_install_dir }}/{{ zk_filename }}/conf/zoo.cfg"
+
+    - name : Running standalone zookeeper application
+      shell : "{{ zk_install_dir }}/{{ zk_filename }}/bin/zkServer.sh start"
+      register : zoo_status
+
+    - name: ZOOKEEPER status
+      debug:
+        msg="ZOOKEEPER is running"
+      when: zoo_status.stdout.find("STARTED") != -1
+
+    - name: ZOOKEEPER status
+      debug:
+          msg="ZOOKEEPER is not running"
+      when: zoo_status.stdout.find("STOPPED") == -1
+
+    - name : configuring and using a systemd unit file
+      copy:
+         src: zookeeper/zookeeper.service
+         dest: /usr/lib/systemd/system/
+
+    - name: File permissions to init script
+      file:
+          path: /usr/lib/systemd/system/zookeeper.service
+          mode: 0755
+
+    - name: Start and enable zookeeper service
+      service:
+          name: zookeeper
+          state: started
+          enabled: true
+
+    - name: ensure that zookeeper is running
+      shell: systemctl status zookeeper
+      register: zk_status
+      ignore_errors: yes
+
+    - name: ZOOKEEPER status with daemon service
+      debug:
+          msg="ZOOKEEPER is running"
+      when: zk_status.stdout.find("running") != -1
+
+    - name: ZOOKEEPER status with daemon service
+      debug:
+          msg="ZOOKEEPER is not running"
+      when: zk_status.stdout.find("running") == -1

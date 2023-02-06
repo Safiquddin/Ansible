@@ -1,0 +1,98 @@
+---
+    - name: Check that rpm exists
+      stat:
+         path: /tmp/{{ rmq_pkg }}
+      register: rpmexist
+
+    - name: download rpms
+      get_url:
+         url: "{{ nexus_url }}/{{ rmq_pkg }}"
+         dest: /var/tmp/
+         url_username: "{{ nexus_uname }}"
+         url_password: "{{ nexus_password }}"
+         mode: 0777
+      when: rpmexist.stat.exists == False
+
+    - name: untar rpm bundle
+      unarchive:
+         src: /tmp/{{ rmq_pkg }}
+         dest: /tmp/
+         remote_src: yes
+
+    - name: installing the Socat Dependancy
+      yum:
+         name: /tmp/{{ item }}
+         state: present
+      with_items:
+        - socat-1.7.3.2-2.amzn2.0.1.x86_64.rpm
+        - erlang-R16B-03.18.el7.x86_64.rpm
+        - logrotate-3.8.6-15.amzn2.x86_64.rpm
+        - rabbitmq-server-3.6.10-1.el7.noarch.rpm
+
+    - name: Setting RMQ as Deamon service
+      shell: chkconfig rabbitmq-server on
+
+    - name: Start the RabbitMQ server
+      service:
+          name: rabbitmq-server
+          state: started
+          enables: yes
+
+    - name: Cleaning the installation files
+      file:
+          path: /tmp/{{ rmq_pkg }}
+          state: absent
+
+    - name: Create an Admin User
+      shell: sudo rabbitmqctl add_user admin admin
+
+    - name: Add the user as an Admin User
+      shell: sudo rabbitmqctl set_user_tags admin administrator
+
+    - name: Set the permissions on the Admin user
+      shell: sudo rabbitmqctl set_permissions -p / admin ".*" ".*" ".*"
+
+    - name: Enable the plugin
+      shell: rabbitmq-plugins enable rabbitmq_management;
+
+    - name: Allow port 15672 for Mgmt UI Plugin
+      shell: iptables -I INPUT 5 -p tcp --dport 15672 -m state --state NEW,ESTABLISHED -j ACCEPT
+
+    - name: Enable federation plugin
+      shell: rabbitmq-plugins enable rabbitmq_federation
+
+    - name: Enable federation management plugin
+      shell: rabbitmq-plugins enable rabbitmq_federation_management
+
+    - name: Enable rabbitmq_tracing plugin
+      shell: rabbitmq-plugins enable rabbitmq_tracing
+
+    - name: Place the configuration files under target directory
+      copy:
+         src: /rmq/rabbitmq-configs
+         dest: /etc/rabbitmq/
+         backup: yes
+
+    - name: Restart the RabbitMQ server
+      service:
+         name: rabbitmq-server
+         state: restarted
+
+    - name: ensure that rmq is running
+      shell: systemctl status rabbitmq-server
+      register: rmq_status
+      ignore_errors: yes
+
+    - name: RMQ status
+      debug:
+          msg="RMQ is running"
+      when: rmq_status.stdout.find("running") != -1
+
+    - name: RMQ status
+      debug:
+          msg="RMQ is not running"
+      when: rmq_status.stdout.find("running") == -1
+
+
+
+

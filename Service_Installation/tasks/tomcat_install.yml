@@ -1,0 +1,104 @@
+---
+    - name:- name: Check that the tomcat package already exists
+      stat:
+          path: /tmp/{{ tomcat_pkg }}.tar.gz
+      register: rpmexist
+
+    - name: download rpms
+       get_url:
+          url: "{{ nexus_url }}/{{ tomcat_pkg }}.tar.gz"
+          dest: /tmp/
+          url_username: "{{ nexus_uname  }}"
+          url_password: "{{ nexus_password }}"
+          mode: 0777
+      when: rpmexist.stat.exists == False
+      
+    - name: add tomcat group
+      group:
+          name: tomcat
+
+    - name: add tomcat user
+      user:
+          name: tomcat
+          group: tomcat
+          home: /user/share/tomcat
+          createhome: no
+
+    - name: create /opt/tomcat directory
+      file:
+          path: /opt/tomcat
+          state: directory
+          mode: 0755
+
+    - name: UnArchive the tomcat file
+      unarchive:
+          src: /tmp/{{ tomcat_pkg }}.tar.gz
+          dest: /tmp/
+          remote_src: yes
+
+    - name : Move to tomcat directory
+      shell : mv /tmp/{{ tomcat_pkg }}/* /opt/tomcat
+
+    - name: Change ownership of tomcat directory
+      file:
+          path: /opt/tomcat
+          owner: tomcat
+          group: tomcat
+          mode: "u+rwx,g+rx,o=rx"
+          recurse: yes
+          state: directory
+
+    - name : Install tomcat init script
+      copy :
+          src : tomcat/tomcat.service
+          dest : /etc/systemd/system/
+          backup : yes
+
+    - name : File permissions to init script
+      file :
+          path : /etc/systemd/system/tomcat.service
+          mode : 0755
+
+    - name: cleaning installation files
+      file:
+          path: /tmp/{{ tomcat_pkg }}.tar.gz
+          state: absent
+
+    - name : daemon-reload
+      command : systemctl daemon-reload
+
+    - name: Start and enable Tomcat service
+      service:
+          name: tomcat
+          state: started
+          enabled: yes
+
+    - name: ensure that tomcat is running
+      shell: systemctl status tomcat
+      register: tomcat_status
+      ignore_errors: yes
+
+    - name: tomcat status
+      debug:
+          msg="tomcat is running"
+      when: tomcat_status.stdout.find("running") != -1
+
+    - name: tomcat status
+      debug:
+          msg="tomcat is not running"
+      when: tomcat_status.stdout.find("running") == -1
+
+
+    - name: tomcat status
+      debug:
+          msg="tomcat is not running"
+      when: tomcat_status.stdout.find("running") == -1
+
+    - name: create keystore directory under tomcat
+      file:
+        path: /opt/tomcat/keystore
+        owner: tomcat
+        group: tomcat
+        recurse: yes
+        state: directory
+

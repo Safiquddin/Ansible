@@ -1,0 +1,26 @@
+
+- hosts: "{{ env }}"
+  tasks:
+  - name: Fetch the contents of the file
+    slurp:
+      src: "{{ src_file }}"
+    register: file_content
+    delegate_to: localhost
+
+  - name: extract content for matching pattern
+    set_fact:
+      file_split: "{{ file_content['content'] | b64decode | regex_findall ('(.+=.+)', multiline=True, ignorecase=True) | regex_replace(' ', '') }}"
+
+  - name: extract content for matching pattern
+    set_fact:
+      path_split: '{{dest_file.split(",")  }}'
+
+
+  - name: Ansible replace string example
+    replace:
+      path: "{{ item[1] }}"
+      regexp: "{{ item[0].split('=')[0]}}"
+      replace: "{{ item[0].split('=')[1]}}"
+    with_nested:
+      - "{{ file_split }}"
+      - "{{ path_split }}"

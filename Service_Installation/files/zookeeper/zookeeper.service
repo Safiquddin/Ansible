@@ -1,0 +1,16 @@
+[Unit]
+Description=Zookeeper
+After=network.target
+[Service]
+Type=forking
+User=solr
+Group=solr
+SyslogIdentifier=solr
+WorkingDirectory=/opt/zookeeper-3.4.10/bin
+ExecStart=/opt/zookeeper-3.4.10/bin/zkServer.sh start
+ExecStop=/opt/zookeeper-3.4.10/bin/zkServer.sh stop
+ExecReload=/opt/zookeeper-3.4.10/bin/zkServer.sh restart
+RestartSec=10
+Restart=always
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,77 @@
+---
+  - name: Check that rpm exists
+    stat:
+      path: /tmp/{{ php_pkg }}
+    register: rpmexist
+
+  - name: download rpms
+    get_url:
+       url: "{{ nexus_url }}/{{ php_pkg }}"
+       dest: /tmp/
+       url_username: "{{ nexus_uname }}"
+       url_password: "{{ nexus_password }}"
+       mode: 0777
+    when: rpmexist.stat.exists == False
+
+  - name: untar rpm bundle
+    unarchive:
+        src: /tmp/{{ php_pkg }}
+        dest: /tmp/
+        remote_src: yes
+
+  - name: install php package alon with dependencies
+    yum:
+       name: /tmp/packages/{{ item }}
+       state: present
+    with_items:
+          - gd-last-2.3.0-2.el7.remi.x86_64.rpm
+          - libmcrypt-2.5.8-13.el7.x86_64.rpm
+          - libraqm-0.7.0-4.el7.x86_64.rpm
+          - libwebp7-1.0.3-1.el7.remi.x86_64.rpm
+          - libzip5-1.7.3-1.el7.remi.x86_64.rpm
+          - php71-2.0-1.el7.remi.x86_64.rpm
+          - php71-php-cli-7.1.33-9.el7.remi.x86_64.rpm
+          - php71-php-common-7.1.33-9.el7.remi.x86_64.rpm
+          - php71-php-fpm-7.1.33-9.el7.remi.x86_64.rpm
+          - php71-php-gd-7.1.33-9.el7.remi.x86_64.rpm
+          - php71-php-json-7.1.33-9.el7.remi.x86_64.rpm
+          - php71-php-mcrypt-7.1.33-9.el7.remi.x86_64.rpm
+          - php71-php-mysqlnd-7.1.33-9.el7.remi.x86_64.rpm
+          - php71-php-opcache-7.1.33-9.el7.remi.x86_64.rpm
+          - php71-php-pdo-7.1.33-9.el7.remi.x86_64.rpm
+          - php71-php-pecl-zip-1.19.0-1.el7.remi.x86_64.rpm
+
+  - name: copying php.ini configuration files
+    copy:
+        src : php/php.ini
+        dest: /etc/php.ini
+        backup: yes
+
+  - name: copying www.conf file to destination
+    copy:
+        src: php/www.conf
+        dest: /etc/php-fpm.d/www.conf
+        backup: yes
+
+  - name: start php-fpm
+    service:
+          name: php-fpm
+          state: started
+          enabled: yes
+
+  - name: ensure that php-fpm is running
+    shell: systemctl status php-fpm
+    register: php_status
+    ignore_errors: yes
+
+  - name: "PHP-FPM status"
+    debug:
+          msg="php-fpm is running"
+    when: php_status.stdout.find("running") != -1
+
+  - name: "PHP--FPM status"
+    debug:
+          msg="php-fpm is not running"
+    when: php_status.stdout.find("running") == -1
+
+

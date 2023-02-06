@@ -1,0 +1,60 @@
+ ---
+    - name: Check that rpm exists
+      stat:
+          path: /tmp/{{ redis_pkg }}
+      register: rpmexist
+
+    - name: download rpms
+      get_url:
+          url: "{{ nexus_url }}/{{ redis_pkg }}"
+          dest: /tmp/
+          url_username: "{{ nexus_uname }}"
+          url_password: "{{ nexus_password }}"
+          mode: 0777
+       when: rpmexist.stat.exists == False
+
+     - name: Installing redis
+       yum:
+          name: /tmp/{{ redis_pkg }}
+          state: present
+
+     - name: Check if Redis is installed
+       package_facts:
+          manager: "auto"
+
+     - name: REDIS test result
+       debug:
+          msg: "Redis found"
+       when: "'redis' in ansible_facts.packages"
+
+     - name: REDIS test result
+       debug:
+          msg: "Redis NOT found"
+       when: "'redis' not in ansible_facts.packages"
+
+     - name: Copying updated redis configuration file
+       copy:
+         src: redis/redis.conf
+         dest: /etc/
+         backup: yes
+
+     - name : Enable and Start Redis Server
+       service:
+          name : redis
+          state : started
+          enabled : yes
+
+     - name: ensure that redis is running
+       shell: systemctl status redis
+       register: redis_status
+       ignore_errors: yes
+
+     - name: redis status
+       debug:
+           msg="redis is running"
+       when: redis_status.stdout.find("running") != -1
+
+     - name: redis status
+       debug:
+           msg="redis is not running"
+       when: redis_status.stdout.find("running") == -1

@@ -1,0 +1,56 @@
+---
+  - name: Check that rpm exists
+    stat:
+      path: /var/tmp/{{ mysql_pkg }}
+    register: rpmexist
+
+  - name: download rpms
+    get_url:
+       url: {{ nexus_url }}/{{ mysql_pkg }}
+       dest: /var/tmp/
+       url_username: {{ nexus_uname }}
+       url_password: {{ nexus_password }}
+       mode: 0777
+    when: rpmexist.stat.exists == False
+
+  - name: untar rpm bundle
+    unarchive:
+        src: /var/tmp/{{ mysql_pkg }}
+        dest: /var/tmp/
+        remote_src: yes
+
+   - name: install mysql
+     yum:
+         name: /var/tmp/{{ item }}
+         state: present
+      with_items:
+        - mysql-community-server-5.7.24-1.el7.x86_64.rpm
+        - mysql-community-libs-compat-5.7.24-1.el7.x86_64.rpm
+        - mysql-community-client-5.7.24-1.el7.x86_64.rpm
+        - mysql-community-common-5.7.24-1.el7.x86_64.rpm
+        - mysql-community-devel-5.7.24-1.el7.x86_64.rpm
+        - mysql-community-embedded-compat-5.7.24-1.el7.x86_64.rpm
+        - mysql-community-libs-5.7.24-1.el7.x86_64.rpm
+
+    - name: start mysql
+      service:
+          name: mysqld
+          state: started
+          enabled: yes
+
+    - name: ensure that mysql is running
+      shell: systemctl status mysqld
+      register: mysql_status
+      ignore_errors: yes
+
+    - name: mysql status
+      debug:
+          msg="mysql is running"
+       when: mysql_status.stdout.find("running") != -1
+
+    - name: mysql status
+      debug:
+          msg="mysql is not running"
+      when: mysql_status.stdout.find("running") == -1
+
+

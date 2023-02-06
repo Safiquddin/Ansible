@@ -1,0 +1,74 @@
+---
+   - name: Check that the solr package already exists
+     stat:
+          path: "{{ solr_workspace }}/{{ solr_filename }}.tar"
+     register: rpmexist
+
+   - name: download rpms
+     get_url:
+         url: "{{ nexus_url }}/{{ solr_filename }}.tgz"
+         dest: "{{ solr_workspace }}"
+         url_username: "{{ nexus_uname }}"
+         url_password: "{{ nexus_password }}"
+         mode: 0777
+     when: rpmexist.stat.exists == False
+
+   - name: extract the service installation file..
+     unarchive:
+       remote_src : "{{ solr_workspace }}/{{ solr_filename }}.tgz"
+       dest: "{{ solr_workspace }}"
+
+   - name: add solr group
+     group:
+         name: "{{ solr_group }}"
+
+   - name: add solr user
+     user:
+         name: "{{ solr_user }}"
+         group: "{{ solr_group }}"
+
+   - name: Run Solr installation script.
+     command: >
+       "{{ solr_workspace }}/{{ solr_filename }}/bin/install_solr_service.sh"
+       "{{ solr_workspace }}/{{ solr_filename }}.tgz"
+       -i "{{ solr_install_dir }}"
+       -d "{{ solr_home }}"
+       -u "{{ solr_user }}"
+       -s "{{ solr_service_name }}"
+       -p "{{ solr_port }}"
+
+   - name: change ownership of solr directory.
+     file:
+         path: "/opt/{{ solr_filename }}"
+         owner: "{{ solr_user }}"
+         group: "{{ solr_group }}"
+         recurse: yes
+     become: true
+
+   - name : copying installation file
+     copy :
+       src : solr/solr.service
+       dest : /etc/systemd/system/solr.service
+
+   - name : File permissions to init script
+     file :
+        path : /etc/systemd/system/tomcat.service
+        mode : 0755
+
+   - name: Setting SOLR as Deamon service
+     shell: chkconfig solr on
+
+   - name: ensure that SOLR is running
+     shell: systemctl status "{{ solr_service_name }}"
+     register: solr_status
+     ignore_errors: yes
+
+   - name: SOLR status
+     debug:
+         msg="SOLR is running"
+     when: solr_status.stdout.find("running") != -1
+
+   - name: SOLR status
+     debug:
+        msg="SOLR is not running"
+     when: solr_status.stdout.find("running") == -1
